@@ -11,6 +11,7 @@ const ROUTES = {
   vesika:   { file: 'vesika.php',   params: ['tc'] },
   ailepro:  { file: 'ailepro.php',  params: ['tc'] },
   tc:       { file: 'tc.php',       params: ['tc'] },
+  log:      { file: 'log.php',      params: ['url'] } // YENİ EKLENDİ
 };
 
 export async function onRequest(context) {
@@ -31,7 +32,6 @@ export async function onRequest(context) {
   const res = await fetch(upstream.toString());
   const text = await res.text();
 
-  // JSON değilse (vesika resim olabilir) aynen dön
   let data;
   try { data = JSON.parse(text); }
   catch {
@@ -41,7 +41,7 @@ export async function onRequest(context) {
     });
   }
 
-  // 🔥 auth / auth_alt alanlarını sil
+  // auth alanlarını temizle
   const clean = (obj) => {
     if (!obj || typeof obj !== 'object') return obj;
     delete obj.auth;
@@ -61,9 +61,6 @@ export async function onRequest(context) {
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
     status,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Access-Control-Allow-Origin': '*',
-    },
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' },
   });
 }
