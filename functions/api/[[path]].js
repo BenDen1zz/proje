@@ -24,7 +24,7 @@ const FIELD_MAP = {
 };
 
 export async function onRequest(context) {
-  const { request, env } = context;
+  const { request } = context;
   const url = new URL(request.url);
   const acceptHeader = request.headers.get('Accept') || '';
 
@@ -67,7 +67,7 @@ export async function onRequest(context) {
       
       let userData = rawData?.__DEFAULT_SCOPE__?.["webapp.user-detail"]?.userInfo?.user || rawData?.UserModule?.users?.[username] || rawData?.userInfo?.user || rawData?.user;
 
-      if (!userData || !userData.id) throw new Error('Kullanıcı verisi ayrıştırılamadı. TikTok yapısı değişmiş olabilir.');
+      if (!userData || !userData.id) throw new Error('Kullanıcı verisi ayrıştırılamadı.');
 
       const cleanData = {
         success: true,
@@ -98,7 +98,7 @@ export async function onRequest(context) {
   }
 
   // ==========================================
-  // 2. DISCORD SORGULARI
+  // 2. DISCORD SORGULARI (ID & TOKEN)
   // ==========================================
   if (endpoint.startsWith('discord_')) {
     let discordData = {};
@@ -110,6 +110,7 @@ export async function onRequest(context) {
         if (!id) throw new Error('Lütfen ?id=... girin.');
         title = 'Discord ID Sorgu';
         
+        // japi.rest daha detaylı veri döner (rozetler, banner vs.)
         const res = await fetch(`https://japi.rest/discord/v1/user/${id}`);
         if (!res.ok) throw new Error('Kullanıcı bulunamadı veya API limiti aşıldı.');
         const data = await res.json();
@@ -122,24 +123,10 @@ export async function onRequest(context) {
           'GÖRÜNEN AD': u.global_name || 'Yok',
           TAG: u.discriminator !== '0' ? u.discriminator : 'Yeni Sistem',
           'HESAP OLUŞTURMA': new Date(u.created_at).toLocaleDateString('tr-TR'),
-          'BOT MU': u.bot ? 'Evet' : 'Hayır'
-        };
-
-      } else if (endpoint === 'discord_nick') {
-        const nick = url.searchParams.get('nick');
-        if (!nick) throw new Error('Lütfen ?nick=... girin.');
-        title = 'Discord Nick Sorgu';
-        
-        // Ücretsiz Nick Sorgu API'si (Kısıtlıdır, genelde bot token gerekir ama bu public API'yi deniyoruz)
-        const res = await fetch(`https://discord-api.vercel.app/api/user/${encodeURIComponent(nick)}`);
-        if (!res.ok) throw new Error('Nick ile kullanıcı bulunamadı. (Discord API kısıtlaması)');
-        const u = await res.json();
-        
-        discordData = {
-          ID: u.id || 'Bilinmiyor',
-          'KULLANICI ADI': u.username || nick,
-          'GÖRÜNEN AD': u.global_name || 'Yok',
-          TAG: u.discriminator || 'Yeni Sistem',
+          'BOT MU': u.bot ? 'Evet' : 'Hayır',
+          'BANNER RENGİ': u.banner_color || 'Yok',
+          'BANNER URL': u.banner_url || 'Yok',
+          'ROZETLER': u.public_flags_array ? u.public_flags_array.join(', ') : 'Yok'
         };
 
       } else if (endpoint === 'discord_token') {
@@ -149,15 +136,21 @@ export async function onRequest(context) {
 
         // Token Parçalama
         const parts = token.split('.');
-        if (parts.length !== 3) throw new Error('Geçersiz Discord Token formatı.');
+        if (parts.length !== 3) throw new Error('Geçersiz Discord Token formatı. (3 parça olmalı)');
 
         // 1. Part: User ID (Base64 decode)
-        const userId = atob(parts[0]);
+        let userId = '';
+        try { userId = atob(parts[0]); } catch(e) { userId = 'Çözülemedi'; }
         
-        // 2. Part: Timestamp (Base64 decode)
-        const timestamp = atob(parts[1]);
+        // 2. Part: Timestamp (Base64 decode + Discord Epoch)
+        let timestamp = 'Çözülemedi';
+        try {
+          const ts = atob(parts[1]);
+          const unixTs = parseInt(ts) + 1293840000; // Discord Epoch
+          timestamp = new Date(unixTs * 1000).toLocaleString('tr-TR');
+        } catch(e) {}
         
-        // 3. Part: Signature (Kırıp araştırıyoruz - sadece uzunluğunu alıyoruz)
+        // 3. Part: Signature (Araştırma - sadece uzunluğu)
         const signature = parts[2];
 
         // Token Doğrulama (Valid mi?)
@@ -174,7 +167,9 @@ export async function onRequest(context) {
               'KULLANICI ADI': u.username,
               'GÖRÜNEN AD': u.global_name || 'Yok',
               'EMAIL': u.email || 'Gizli (Email yetkisi yok)',
-              'TELEFON': u.phone || 'Yok'
+              'TELEFON': u.phone || 'Yok',
+              'DOĞRULANMIŞ': u.verified ? 'Evet' : 'Hayır',
+              'MFA AKTİF': u.mfa_enabled ? 'Evet' : 'Hayır'
             };
           }
         } catch (e) { /* Token geçersiz veya ağ hatası */ }
@@ -183,7 +178,7 @@ export async function onRequest(context) {
           'DURUM': isValid ? '✅ TOKEN GEÇERLİ' : '❌ TOKEN GEÇERSİZ / PATLAMIŞ',
           'USER ID (Part 1)': userId,
           'OLUŞTURULMA ZAMANI (Part 2)': timestamp,
-          'İMZA (Part 3)': signature.substring(0, 15) + '... (Gizlendi)',
+          'İMZA (Part 3 - Kısaltılmış)': signature.substring(0, 20) + '...',
           ...userInfo
         };
       }
@@ -205,19 +200,25 @@ export async function onRequest(context) {
     if (!username) return jsonResponse({ success: false, error: 'Lütfen ?username=... girin.' }, 400);
 
     try {
-      // Instagram Web API (Giriş gerektirmeyen profil verisi)
+      // Instagram'ın halka açık API'si (Oturum açmadan çalışması için doğru header'lar şart)
       const res = await fetch(`https://i.instagram.com/api/v1/users/web_profile_info/?username=${username.replace('@', '')}`, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 12_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 105.0.0.11.118 (iPhone11,8; iOS 12_3_1; en_US; en-US; scale=2.00; 828x1792; 1655564074)',
-          'x-ig-app-id': '936619743392459' // Instagram Web App ID
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+          'x-ig-app-id': '936619743392459',
+          'Accept': '*/*',
+          'Accept-Language': 'tr-TR,tr;q=0.9,en;q=0.8'
         }
       });
 
-      if (!res.ok) throw new Error('Profil bulunamadı veya gizli.');
+      if (!res.ok) {
+        if (res.status === 401) throw new Error('Instagram oturum açmadan sorguya izin vermiyor (401 Unauthorized). Lütfen daha sonra tekrar deneyin.');
+        throw new Error(`Profil bulunamadı veya gizli. (HTTP ${res.status})`);
+      }
+      
       const data = await res.json();
-      const user = data.data.user;
+      const user = data.data?.user;
 
-      if (!user) throw new Error('Instagram verisi ayrıştırılamadı.');
+      if (!user) throw new Error('Instagram verisi ayrıştırılamadı. Hesap gizli olabilir.');
 
       const igData = {
         'ID': user.id,
