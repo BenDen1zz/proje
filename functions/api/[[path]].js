@@ -24,64 +24,51 @@ const FIELD_MAP = {
 };
 
 export async function onRequest(context) {
-  const { request } = context;
+  const { request, env } = context;
   const url = new URL(request.url);
   const acceptHeader = request.headers.get('Accept') || '';
 
   const endpoint = url.pathname.replace('/api/', '').split('/')[0];
 
-  // --- 1. TIKTOK SORGULARI ---
+  // ==========================================
+  // 1. TIKTOK SORGULARI
+  // ==========================================
   if (endpoint === 'tiktok_user' || endpoint === 'tiktok_id') {
     const username = url.searchParams.get('username');
     const userId = url.searchParams.get('user_id');
 
-    if (!username && !userId) {
-      return jsonResponse({ success: false, error: 'Lütfen ?username=... veya ?user_id=... girin.' }, 400);
-    }
+    if (!username && !userId) return jsonResponse({ success: false, error: 'Lütfen ?username=... veya ?user_id=... girin.' }, 400);
 
     try {
       const targetUrl = username 
         ? `https://www.tiktok.com/@${username.replace('@', '')}` 
-        : `https://www.tiktok.com/@i/AM/${userId}`;
+        : `https://www.tiktok.com/share/user/${userId}`;
 
       const res = await fetch(targetUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
           'Accept-Language': 'tr-TR,tr;q=0.9,en;q=0.8'
-        }
+        },
+        redirect: 'follow'
       });
 
       if (!res.ok) throw new Error(`TikTok sayfası yüklenemedi. Durum: ${res.status}`);
-
       const html = await res.text();
       
-      // Hem __UNIVERSAL_DATA_FOR_REHYDRATION__ hem de SIGI_STATE kontrolü
       const matchUniversal = html.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application\/json">(.*?)<\/script>/);
       const matchSigi = html.match(/<script id="SIGI_STATE" type="application\/json">(.*?)<\/script>/);
       
       let rawData = null;
-      if (matchUniversal && matchUniversal[1]) {
-          rawData = JSON.parse(matchUniversal[1]);
-      } else if (matchSigi && matchSigi[1]) {
-          rawData = JSON.parse(matchSigi[1]);
-      }
+      if (matchUniversal && matchUniversal[1]) rawData = JSON.parse(matchUniversal[1]);
+      else if (matchSigi && matchSigi[1]) rawData = JSON.parse(matchSigi[1]);
 
-      if (!rawData) {
-          throw new Error('Profil verisi bulunamadı. Hesap gizli veya silinmiş olabilir.');
-      }
+      if (!rawData) throw new Error('Profil verisi bulunamadı. TikTok bot koruması devrede olabilir.');
       
-      // Olası tüm veri yollarını dene
-      let userData = 
-        rawData?.__DEFAULT_SCOPE__?.["webapp.user-detail"]?.userInfo?.user || 
-        rawData?.UserModule?.users?.[username] || 
-        rawData?.userInfo?.user || 
-        rawData?.user;
+      let userData = rawData?.__DEFAULT_SCOPE__?.["webapp.user-detail"]?.userInfo?.user || rawData?.UserModule?.users?.[username] || rawData?.userInfo?.user || rawData?.user;
 
-      if (!userData || !userData.id) {
-          throw new Error(`Kullanıcı verisi ayrıştırılamadı. TikTok bot koruması devrede olabilir.`);
-      }
+      if (!userData || !userData.id) throw new Error('Kullanıcı verisi ayrıştırılamadı. TikTok yapısı değişmiş olabilir.');
 
-      // Region ve Language (Bölge ve Dil) eklendi
       const cleanData = {
         success: true,
         data: {
@@ -89,11 +76,9 @@ export async function onRequest(context) {
           sec_uid: userData.secUid,
           username: userData.uniqueId,
           nickname: userData.nickname,
-          avatar: userData.avatarLarger,
           bio: userData.signature,
           verified: userData.verified,
-          private_account: userData.privateAccount,
-          region: userData.region || userData.regionCode || 'Bilinmiyor',
+          region: userData.region || 'Bilinmiyor',
           language: userData.language || 'Bilinmiyor',
           stats: {
             follower_count: userData.stats?.followerCount || 0,
@@ -104,20 +89,161 @@ export async function onRequest(context) {
         }
       };
 
-      if (acceptHeader.includes('text/html')) {
-        return new Response(renderTikTokHtml(cleanData.data), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
-      }
+      if (acceptHeader.includes('text/html')) return new Response(renderTikTokHtml(cleanData.data), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
       return jsonResponse(cleanData);
-
     } catch (error) {
-      if (acceptHeader.includes('text/html')) {
-        return new Response(renderErrorHtml(error.message), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
-      }
+      if (acceptHeader.includes('text/html')) return new Response(renderErrorHtml(error.message), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
       return jsonResponse({ success: false, error: error.message }, 500);
     }
   }
 
-  // --- 2. NÜFUS / LOG API'LERİ ---
+  // ==========================================
+  // 2. DISCORD SORGULARI
+  // ==========================================
+  if (endpoint.startsWith('discord_')) {
+    let discordData = {};
+    let title = '';
+
+    try {
+      if (endpoint === 'discord_id') {
+        const id = url.searchParams.get('id');
+        if (!id) throw new Error('Lütfen ?id=... girin.');
+        title = 'Discord ID Sorgu';
+        
+        const res = await fetch(`https://japi.rest/discord/v1/user/${id}`);
+        if (!res.ok) throw new Error('Kullanıcı bulunamadı veya API limiti aşıldı.');
+        const data = await res.json();
+        if (!data.data) throw new Error('Veri bulunamadı.');
+        
+        const u = data.data;
+        discordData = {
+          ID: u.id,
+          'KULLANICI ADI': u.username,
+          'GÖRÜNEN AD': u.global_name || 'Yok',
+          TAG: u.discriminator !== '0' ? u.discriminator : 'Yeni Sistem',
+          'HESAP OLUŞTURMA': new Date(u.created_at).toLocaleDateString('tr-TR'),
+          'BOT MU': u.bot ? 'Evet' : 'Hayır'
+        };
+
+      } else if (endpoint === 'discord_nick') {
+        const nick = url.searchParams.get('nick');
+        if (!nick) throw new Error('Lütfen ?nick=... girin.');
+        title = 'Discord Nick Sorgu';
+        
+        // Ücretsiz Nick Sorgu API'si (Kısıtlıdır, genelde bot token gerekir ama bu public API'yi deniyoruz)
+        const res = await fetch(`https://discord-api.vercel.app/api/user/${encodeURIComponent(nick)}`);
+        if (!res.ok) throw new Error('Nick ile kullanıcı bulunamadı. (Discord API kısıtlaması)');
+        const u = await res.json();
+        
+        discordData = {
+          ID: u.id || 'Bilinmiyor',
+          'KULLANICI ADI': u.username || nick,
+          'GÖRÜNEN AD': u.global_name || 'Yok',
+          TAG: u.discriminator || 'Yeni Sistem',
+        };
+
+      } else if (endpoint === 'discord_token') {
+        const token = url.searchParams.get('token');
+        if (!token) throw new Error('Lütfen ?token=... girin.');
+        title = 'Discord Token Çözücü & Sorgu';
+
+        // Token Parçalama
+        const parts = token.split('.');
+        if (parts.length !== 3) throw new Error('Geçersiz Discord Token formatı.');
+
+        // 1. Part: User ID (Base64 decode)
+        const userId = atob(parts[0]);
+        
+        // 2. Part: Timestamp (Base64 decode)
+        const timestamp = atob(parts[1]);
+        
+        // 3. Part: Signature (Kırıp araştırıyoruz - sadece uzunluğunu alıyoruz)
+        const signature = parts[2];
+
+        // Token Doğrulama (Valid mi?)
+        let isValid = false;
+        let userInfo = {};
+        try {
+          const valRes = await fetch('https://discord.com/api/v10/users/@me', {
+            headers: { Authorization: token }
+          });
+          if (valRes.ok) {
+            isValid = true;
+            const u = await valRes.json();
+            userInfo = {
+              'KULLANICI ADI': u.username,
+              'GÖRÜNEN AD': u.global_name || 'Yok',
+              'EMAIL': u.email || 'Gizli (Email yetkisi yok)',
+              'TELEFON': u.phone || 'Yok'
+            };
+          }
+        } catch (e) { /* Token geçersiz veya ağ hatası */ }
+
+        discordData = {
+          'DURUM': isValid ? '✅ TOKEN GEÇERLİ' : '❌ TOKEN GEÇERSİZ / PATLAMIŞ',
+          'USER ID (Part 1)': userId,
+          'OLUŞTURULMA ZAMANI (Part 2)': timestamp,
+          'İMZA (Part 3)': signature.substring(0, 15) + '... (Gizlendi)',
+          ...userInfo
+        };
+      }
+
+      if (acceptHeader.includes('text/html')) return new Response(renderGenericHtml(title, discordData), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+      return jsonResponse({ success: true, endpoint, data: discordData });
+
+    } catch (error) {
+      if (acceptHeader.includes('text/html')) return new Response(renderErrorHtml(error.message), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+      return jsonResponse({ success: false, error: error.message }, 500);
+    }
+  }
+
+  // ==========================================
+  // 3. INSTAGRAM SORGUSU
+  // ==========================================
+  if (endpoint === 'instagram') {
+    const username = url.searchParams.get('username');
+    if (!username) return jsonResponse({ success: false, error: 'Lütfen ?username=... girin.' }, 400);
+
+    try {
+      // Instagram Web API (Giriş gerektirmeyen profil verisi)
+      const res = await fetch(`https://i.instagram.com/api/v1/users/web_profile_info/?username=${username.replace('@', '')}`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 12_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 105.0.0.11.118 (iPhone11,8; iOS 12_3_1; en_US; en-US; scale=2.00; 828x1792; 1655564074)',
+          'x-ig-app-id': '936619743392459' // Instagram Web App ID
+        }
+      });
+
+      if (!res.ok) throw new Error('Profil bulunamadı veya gizli.');
+      const data = await res.json();
+      const user = data.data.user;
+
+      if (!user) throw new Error('Instagram verisi ayrıştırılamadı.');
+
+      const igData = {
+        'ID': user.id,
+        'KULLANICI ADI': '@' + user.username,
+        'AD SOYAD': user.full_name,
+        'BİYOGRAFİ': user.biography || 'Yok',
+        'TAKİPÇİ': user.edge_followed_by.count,
+        'TAKİP EDİLEN': user.edge_follow.count,
+        'GÖNDERİ SAYISI': user.edge_owner_to_timeline_media.count,
+        'DOĞRULANMIŞ': user.is_verified ? 'Evet' : 'Hayır',
+        'GİZLİ HESAP': user.is_private ? 'Evet' : 'Hayır',
+        'PROFİL FOTOĞRAFI': user.profile_pic_url_hd
+      };
+
+      if (acceptHeader.includes('text/html')) return new Response(renderGenericHtml('Gözlerin Instagram', igData), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+      return jsonResponse({ success: true, data: igData });
+
+    } catch (error) {
+      if (acceptHeader.includes('text/html')) return new Response(renderErrorHtml(error.message), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+      return jsonResponse({ success: false, error: error.message }, 500);
+    }
+  }
+
+  // ==========================================
+  // 4. NÜFUS / LOG API'LERİ
+  // ==========================================
   const route = ROUTES[endpoint];
   if (!route) return jsonResponse({ error: 'Gecersiz endpoint' }, 404);
 
@@ -134,13 +260,9 @@ export async function onRequest(context) {
     let data;
     try { data = JSON.parse(text); }
     catch {
-      return new Response(text, {
-        status: res.status,
-        headers: { 'Content-Type': res.headers.get('Content-Type') || 'text/plain', 'Access-Control-Allow-Origin': '*' },
-      });
+      return new Response(text, { status: res.status, headers: { 'Content-Type': res.headers.get('Content-Type') || 'text/plain', 'Access-Control-Allow-Origin': '*' } });
     }
 
-    // auth alanlarını temizle
     const clean = (obj) => {
       if (!obj || typeof obj !== 'object') return obj;
       delete obj.auth;
@@ -155,17 +277,16 @@ export async function onRequest(context) {
     };
     const cleanData = clean(data);
 
-    if (acceptHeader.includes('text/html')) {
-      return new Response(renderNufusHtml(cleanData), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
-    }
-
+    if (acceptHeader.includes('text/html')) return new Response(renderNufusHtml(cleanData), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
     return jsonResponse(cleanData, res.status);
   } catch (err) {
     return jsonResponse({ error: 'Upstream sunucuya ulaşılamadı.' }, 500);
   }
 }
 
-// --- YARDIMCI FONKSİYONLAR ---
+// ==========================================
+// YARDIMCI FONKSİYONLAR (HTML ÇIKTILARI)
+// ==========================================
 
 function jsonResponse(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
@@ -174,6 +295,7 @@ function jsonResponse(obj, status = 200) {
   });
 }
 
+// Nüfus Verisi Çıktısı
 function renderNufusHtml(data) {
   let records = [];
   if (Array.isArray(data.veri)) records = data.veri;
@@ -181,8 +303,7 @@ function renderNufusHtml(data) {
   else if (typeof data === 'object' && data !== null) records = [data];
   
   records = records.filter(r => r && typeof r === 'object');
-
-  if (!records.length) return renderErrorHtml('Sonuç bulunamadı veya boş döndü.');
+  if (!records.length) return renderErrorHtml('Sonuç bulunamadı.');
 
   let bodyHtml = '';
   records.forEach((rec, idx) => {
@@ -200,12 +321,12 @@ function renderNufusHtml(data) {
     }
     bodyHtml += `╰━━━━━━━ Gözlerin ━━━━━━━`;
   });
-
   return baseHtml(bodyHtml);
 }
 
+// TikTok Çıktısı
 function renderTikTokHtml(d) {
-  let bodyHtml = `╭━━━━━━━ TIKTOK ━━━━━━━<br>`;
+  let bodyHtml = `╭━━━━━━━ Gözlerin Tiktok ━━━━━━━<br>`;
   bodyHtml += `┃➥ <span style="color:#4fc3f7">ID:</span> ${d.id}<br>`;
   bodyHtml += `┃➥ <span style="color:#4fc3f7">KULLANICI ADI:</span> @${d.username}<br>`;
   bodyHtml += `┃➥ <span style="color:#4fc3f7">AD SOYAD:</span> ${d.nickname}<br>`;
@@ -215,7 +336,17 @@ function renderTikTokHtml(d) {
   bodyHtml += `┃➥ <span style="color:#4fc3f7">TAKİPÇİ:</span> ${d.stats.follower_count}<br>`;
   bodyHtml += `┃➥ <span style="color:#4fc3f7">TAKİP EDİLEN:</span> ${d.stats.following_count}<br>`;
   bodyHtml += `┃➥ <span style="color:#4fc3f7">BEĞENİ:</span> ${d.stats.heart_count}<br>`;
-  bodyHtml += `╰━━━━━━━ TIKTOK ━━━━━━━`;
+  bodyHtml += `╰━━━━━━━ Gözlerin Tiktok ━━━━━━━`;
+  return baseHtml(bodyHtml);
+}
+
+// Discord & Instagram İçin Genel Çıktı
+function renderGenericHtml(title, dataObj) {
+  let bodyHtml = `╭━━━━━━━ ${title} ━━━━━━━<br>`;
+  for (const [k, v] of Object.entries(dataObj)) {
+    bodyHtml += `┃➥ <span style="color:#4fc3f7">${k}:</span> ${v}<br>`;
+  }
+  bodyHtml += `╰━━━━━━━ ${title} ━━━━━━━`;
   return baseHtml(bodyHtml);
 }
 
@@ -236,4 +367,4 @@ function baseHtml(content) {
 </style>
 </head>
 <body><div class="container">${content}</div></body></html>`;
-                                                               }
+}
