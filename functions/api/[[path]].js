@@ -28,7 +28,6 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   const acceptHeader = request.headers.get('Accept') || '';
 
-  // Endpoint'i al: /api/tc -> "tc", /api/tiktok_user -> "tiktok_user"
   const endpoint = url.pathname.replace('/api/', '').split('/')[0];
 
   // --- 1. TIKTOK SORGULARI ---
@@ -55,14 +54,33 @@ export async function onRequest(context) {
       if (!res.ok) throw new Error(`TikTok sayfası yüklenemedi. Durum: ${res.status}`);
 
       const html = await res.text();
-      const match = html.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application\/json">(.*?)<\/script>/);
       
-      if (!match || !match[1]) throw new Error('Profil verisi bulunamadı. Hesap gizli veya silinmiş olabilir.');
+      // Hem __UNIVERSAL_DATA_FOR_REHYDRATION__ hem de SIGI_STATE kontrolü
+      const matchUniversal = html.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application\/json">(.*?)<\/script>/);
+      const matchSigi = html.match(/<script id="SIGI_STATE" type="application\/json">(.*?)<\/script>/);
+      
+      let rawData = null;
+      if (matchUniversal && matchUniversal[1]) {
+          rawData = JSON.parse(matchUniversal[1]);
+      } else if (matchSigi && matchSigi[1]) {
+          rawData = JSON.parse(matchSigi[1]);
+      }
 
-      const rawData = JSON.parse(match[1]);
-      const userData = rawData?.__DEFAULT_SCOPE__?.["webapp.user-detail"]?.userInfo?.user;
+      if (!rawData) {
+          throw new Error('Profil verisi bulunamadı. Hesap gizli veya silinmiş olabilir.');
+      }
       
-      if (!userData) throw new Error('Kullanıcı verisi ayrıştırılamadı (TikTok yapısı değişmiş olabilir).');
+      // Olası tüm veri yollarını dene
+      let userData = 
+        rawData?.__DEFAULT_SCOPE__?.["webapp.user-detail"]?.userInfo?.user || 
+        rawData?.__DEFAULT_SCOPE__?.["webapp.user-detail"]?.userInfo?.user ||
+        rawData?.UserModule?.users?.[username] || 
+        rawData?.userInfo?.user || 
+        rawData?.user;
+
+      if (!userData || !userData.id) {
+          throw new Error(`Kullanıcı verisi ayrıştırılamadı. TikTok bot koruması devrede olabilir.`);
+      }
 
       const cleanData = {
         success: true,
@@ -85,7 +103,6 @@ export async function onRequest(context) {
         }
       };
 
-      // Tarayıcıdan girildiyse HTML dön
       if (acceptHeader.includes('text/html')) {
         return new Response(renderTikTokHtml(cleanData.data), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
       }
@@ -99,7 +116,7 @@ export async function onRequest(context) {
     }
   }
 
-  // --- 2. NÜFUS / DİĞER API'LER ---
+  // --- 2. NÜFUS / LOG API'LERİ ---
   const route = ROUTES[endpoint];
   if (!route) return jsonResponse({ error: 'Gecersiz endpoint' }, 404);
 
