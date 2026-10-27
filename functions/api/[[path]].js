@@ -73,7 +73,6 @@ export async function onRequest(context) {
       // Olası tüm veri yollarını dene
       let userData = 
         rawData?.__DEFAULT_SCOPE__?.["webapp.user-detail"]?.userInfo?.user || 
-        rawData?.__DEFAULT_SCOPE__?.["webapp.user-detail"]?.userInfo?.user ||
         rawData?.UserModule?.users?.[username] || 
         rawData?.userInfo?.user || 
         rawData?.user;
@@ -82,6 +81,7 @@ export async function onRequest(context) {
           throw new Error(`Kullanıcı verisi ayrıştırılamadı. TikTok bot koruması devrede olabilir.`);
       }
 
+      // Region ve Language (Bölge ve Dil) eklendi
       const cleanData = {
         success: true,
         data: {
@@ -93,7 +93,8 @@ export async function onRequest(context) {
           bio: userData.signature,
           verified: userData.verified,
           private_account: userData.privateAccount,
-          region: userData.region,
+          region: userData.region || userData.regionCode || 'Bilinmiyor',
+          language: userData.language || 'Bilinmiyor',
           stats: {
             follower_count: userData.stats?.followerCount || 0,
             following_count: userData.stats?.followingCount || 0,
@@ -209,6 +210,8 @@ function renderTikTokHtml(d) {
   bodyHtml += `┃➥ <span style="color:#4fc3f7">KULLANICI ADI:</span> @${d.username}<br>`;
   bodyHtml += `┃➥ <span style="color:#4fc3f7">AD SOYAD:</span> ${d.nickname}<br>`;
   if (d.bio) bodyHtml += `┃➥ <span style="color:#4fc3f7">BİYOGRAFİ:</span> ${d.bio}<br>`;
+  bodyHtml += `┃➥ <span style="color:#4fc3f7">BÖLGE (REGION):</span> ${d.region}<br>`;
+  bodyHtml += `┃➥ <span style="color:#4fc3f7">DİL (LANGUAGE):</span> ${d.language}<br>`;
   bodyHtml += `┃➥ <span style="color:#4fc3f7">TAKİPÇİ:</span> ${d.stats.follower_count}<br>`;
   bodyHtml += `┃➥ <span style="color:#4fc3f7">TAKİP EDİLEN:</span> ${d.stats.following_count}<br>`;
   bodyHtml += `┃➥ <span style="color:#4fc3f7">BEĞENİ:</span> ${d.stats.heart_count}<br>`;
@@ -233,4 +236,4 @@ function baseHtml(content) {
 </style>
 </head>
 <body><div class="container">${content}</div></body></html>`;
-}
+                                                               }
