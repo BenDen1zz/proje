@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gözlerin API & Sorgu Paneli</title>
+<title>Gözlerin OSINT & Sorgu Paneli</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
@@ -102,7 +102,7 @@
 
 <div class="container">
   <div class="header">
-    <h1>/// GÖZLERİN SİSTEMİ ///</h1>
+    <h1>/// GÖZLERİN OSINT ///</h1>
   </div>
 
   <!-- SORGU MENÜSÜ -->
@@ -133,30 +133,34 @@
 </div>
 
 <script>
-// TÜM API TANIMLARI (Discord Nick kaldırıldı, Token ve ID gelişmiş halde)
+// TÜM API TANIMLARI (Nüfus, Sosyal Medya ve OSINT)
 const API_DEFS = {
-  log:           { title: 'URL Log Çekme', params: [{k: 'url', l: 'Log URL', ph: 'https://...'}] },
-  adsoyad:       { title: 'Ad Soyad Sorgu', params: [{k: 'ad', l: 'Ad', ph: 'Ahmet'}, {k: 'soyad', l: 'Soyad', ph: 'Yılmaz'}, {k: 'il', l: 'İl (Opsiyonel)', ph: 'Ankara'}, {k: 'ilce', l: 'İlçe (Opsiyonel)', ph: 'Çankaya'}] },
-  adililce:      { title: 'Ad İl İlçe Sorgu', params: [{k: 'ad', l: 'Ad', ph: 'Ahmet'}, {k: 'il', l: 'İl', ph: 'Ankara'}, {k: 'ilce', l: 'İlçe', ph: 'Çankaya'}] },
-  tc:            { title: 'TC Kimlik Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
-  tcgsm:         { title: 'TC -> GSM Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
-  gsmtc:         { title: 'GSM -> TC Sorgu', params: [{k: 'gsm', l: 'GSM No', ph: '5xx...'}] },
-  ailepro:       { title: 'Aile Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
-  vesika:        { title: 'Vesika Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
-  isyeri:        { title: 'İş Yeri Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
-  sgk:           { title: 'SGK Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
-  adres:         { title: 'Adres Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
+  // NÜFUS & LOG
+  log:             { title: 'URL Log Çekme', params: [{k: 'url', l: 'Log URL', ph: 'https://...'}] },
+  adsoyad:         { title: 'Ad Soyad Sorgu', params: [{k: 'ad', l: 'Ad', ph: 'Ahmet'}, {k: 'soyad', l: 'Soyad', ph: 'Yılmaz'}, {k: 'il', l: 'İl (Opsiyonel)', ph: 'Ankara'}, {k: 'ilce', l: 'İlçe (Opsiyonel)', ph: 'Çankaya'}] },
+  adililce:        { title: 'Ad İl İlçe Sorgu', params: [{k: 'ad', l: 'Ad', ph: 'Ahmet'}, {k: 'il', l: 'İl', ph: 'Ankara'}, {k: 'ilce', l: 'İlçe', ph: 'Çankaya'}] },
+  tc:              { title: 'TC Kimlik Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
+  tcgsm:           { title: 'TC -> GSM Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
+  gsmtc:           { title: 'GSM -> TC Sorgu', params: [{k: 'gsm', l: 'GSM No', ph: '5xx...'}] },
+  ailepro:         { title: 'Aile Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
+  vesika:          { title: 'Vesika Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
+  isyeri:          { title: 'İş Yeri Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
+  sgk:             { title: 'SGK Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
+  adres:           { title: 'Adres Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
   
-  // TIKTOK
-  tiktok_user:   { title: 'TikTok Kullanıcı Sorgu', params: [{k: 'username', l: 'Kullanıcı Adı', ph: 'd9wqq'}] },
-  tiktok_id:     { title: 'TikTok ID ile Sorgu', params: [{k: 'user_id', l: 'TikTok ID', ph: '75869304178408169'}] },
+  // SOSYAL MEDYA
+  tiktok_user:     { title: 'TikTok Kullanıcı Sorgu', params: [{k: 'username', l: 'Kullanıcı Adı', ph: 'd9wqq'}] },
+  tiktok_id:       { title: 'TikTok ID ile Sorgu', params: [{k: 'user_id', l: 'TikTok ID', ph: '75869304178408169'}] },
+  discord_id:      { title: 'Discord ID Sorgu', params: [{k: 'id', l: 'Discord ID', ph: '123456789012345678'}] },
+  discord_token:   { title: 'Discord Token Çözücü', params: [{k: 'token', l: 'Token', ph: 'MTA...'}] },
+  instagram:       { title: 'Instagram Sorgu', params: [{k: 'username', l: 'Kullanıcı Adı', ph: 'cristiano'}] },
   
-  // DISCORD (Gelişmiş)
-  discord_id:    { title: 'Discord ID Sorgu', params: [{k: 'id', l: 'Discord ID', ph: '123456789012345678'}] },
-  discord_token: { title: 'Discord Token Çözücü', params: [{k: 'token', l: 'Token', ph: 'MTA...'}] },
-  
-  // INSTAGRAM
-  instagram:     { title: 'Instagram Sorgu', params: [{k: 'username', l: 'Kullanıcı Adı', ph: 'cristiano'}] }
+  // OSINT ARAÇLARI
+  ip_lookup:       { title: 'IP Sorgulama', params: [{k: 'ip', l: 'IP Adresi', ph: '8.8.8.8'}] },
+  password_check:  { title: 'Şifre İhlal Kontrolü', params: [{k: 'password', l: 'Şifre', ph: '123456'}] },
+  sherlock:        { title: 'Sherlock Kullanıcı Adı', params: [{k: 'username', l: 'Kullanıcı Adı', ph: 'johndoe'}] },
+  holehe:          { title: 'Holehe E-posta Taraması', params: [{k: 'email', l: 'E-posta', ph: 'test@gmail.com'}] },
+  username_search: { title: 'WhatsMyName Kullanıcı Adı', params: [{k: 'username', l: 'Kullanıcı Adı', ph: 'johndoe'}] }
 };
 
 const domain = window.location.origin;
@@ -220,7 +224,7 @@ async function doQuery() {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 saniye zaman aşımı
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 saniye zaman aşımı
 
     let res = await fetch(`/api/${queryEndpoint.value}?${params.toString()}`, { signal: controller.signal });
     clearTimeout(timeoutId);
@@ -254,21 +258,40 @@ function renderResult(data, endpoint) {
     return;
   }
 
-  // TIKTOK, DISCORD, INSTAGRAM (STANDART data.data DÖNER)
+  // SOSYAL MEDYA VE OSINT SONUÇLARI (STANDART data.data DÖNER)
   if (data.success && data.data) {
     let d = data.data;
     let title = "Gözlerin";
     if(endpoint.includes('tiktok')) title = "Gözlerin Tiktok";
     else if(endpoint.includes('discord')) title = "Gözlerin Discord";
     else if(endpoint.includes('instagram')) title = "Gözlerin Instagram";
+    else if(endpoint.includes('ip_')) title = "Gözlerin IP Sorgu";
+    else if(endpoint.includes('password')) title = "Gözlerin Şifre Kontrolü";
+    else if(endpoint.includes('sherlock')) title = "Gözlerin Sherlock";
+    else if(endpoint.includes('holehe')) title = "Gözlerin Holehe";
+    else if(endpoint.includes('username')) title = "Gözlerin WhatsMyName";
 
     let html = `<span class="res-title">╭━━━━━━━ ${title} ━━━━━━━</span>\n`;
     
-    for (const [k, v] of Object.entries(d)) {
-      if (v !== undefined && v !== null && v !== '') {
-        html += `┃➥ <span class="res-key">${k}:</span> <span class="res-val">${esc(String(v))}</span>\n`;
+    if (Array.isArray(d)) {
+      // Eğer sonuç bir array ise (Sherlock, WhatsMyName vb.)
+      if (d.length === 0) html += `┃➥ <span class="res-val">Kayıt bulunamadı.</span>\n`;
+      d.forEach(item => {
+        let line = [];
+        for (const [k, v] of Object.entries(item)) {
+          if (v) line.push(`${k}: ${v}`);
+        }
+        if(line.length > 0) html += `┃➥ <span class="res-key">${line.join(' | ')}</span>\n`;
+      });
+    } else {
+      // Eğer sonuç bir obje ise (IP, Token vb.)
+      for (const [k, v] of Object.entries(d)) {
+        if (v !== undefined && v !== null && v !== '') {
+          html += `┃➥ <span class="res-key">${k}:</span> <span class="res-val">${esc(String(v))}</span>\n`;
+        }
       }
     }
+    
     html += `<span class="res-title">╰━━━━━━━ ${title} ━━━━━━━</span>`;
     resultBox.innerHTML = html;
     return;
