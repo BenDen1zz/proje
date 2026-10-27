@@ -40,7 +40,7 @@
   }
   .nav-btn {
     background: none; border: none; color: #888;
-    font-family: inherit; font-size: 16px; cursor: pointer;
+    font-family: inherit; font-size: 15px; cursor: pointer;
     display: flex; flex-direction: column; align-items: center; gap: 5px;
     transition: all 0.3s;
   }
@@ -57,7 +57,8 @@
   }
   .query-box select:focus, .query-box input:focus { border-color: #ff0000; background: rgba(255, 0, 0, 0.1); }
   .btn-query { width: 100%; padding: 12px; background: #ff3333; color: #fff; border: none; font-family: inherit; font-size: 16px; cursor: pointer; font-weight: bold; text-transform: uppercase; }
-  .btn-query:hover { background: #ff0000; box-shadow: 0 0 15px #ff0000; }
+  .btn-query:hover:not(:disabled) { background: #ff0000; box-shadow: 0 0 15px #ff0000; }
+  .btn-query:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .result-box {
     background: #000; border: 1px solid #ff3333; padding: 20px;
@@ -69,37 +70,30 @@
   .res-key { color: #4fc3f7; }
   .res-val { color: #00ff88; }
 
-  /* API KARTLARI TASARIMI */
+  /* API KATALOĞU TASARIMI */
   .api-card {
     background: rgba(10, 0, 0, 0.8); border: 1px solid rgba(255, 0, 0, 0.3);
     border-left: 5px solid #ff0000; padding: 20px; margin-bottom: 15px;
-    display: flex; justify-content: space-between; align-items: center;
   }
   .api-card:hover { box-shadow: 0 0 15px rgba(255, 0, 0, 0.2); background: rgba(20, 0, 0, 0.9); }
-  .api-info h2 { font-size: 18px; margin-bottom: 8px; }
-  .api-info .code-snippet { background: rgba(255, 0, 0, 0.1); color: #ff5555; padding: 5px 10px; font-size: 12px; border: 1px solid rgba(255, 0, 0, 0.3); display: inline-block; word-break: break-all; }
-  .btn-start { background: transparent; color: #ff3333; border: 1px solid #ff3333; padding: 10px 20px; font-family: inherit; cursor: pointer; text-transform: uppercase; }
-  .btn-start:hover { background: #ff3333; color: #000; box-shadow: 0 0 15px #ff3333; }
-
-  /* MODAL */
-  .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); backdrop-filter: blur(5px); display: none; justify-content: center; align-items: center; z-index: 1000; padding: 20px;}
-  .modal-overlay.active { display: flex; }
-  .modal { background: #0a0000; border: 1px solid #ff3333; width: 100%; max-width: 500px; padding: 25px; box-shadow: 0 0 30px rgba(255, 0, 0, 0.3); position: relative; }
-  .modal h3 { color: #ff3333; margin-bottom: 20px; border-bottom: 1px solid rgba(255,0,0,0.3); padding-bottom: 10px; }
-  .input-group { margin-bottom: 15px; }
-  .input-group label { display: block; color: #ff5555; font-size: 12px; margin-bottom: 5px; }
-  .input-group input { width: 100%; padding: 10px; background: rgba(255, 0, 0, 0.05); border: 1px solid rgba(255, 0, 0, 0.3); color: #fff; font-family: inherit; outline: none; }
-  .generated-url { background: #000; border: 1px dashed #ff3333; padding: 15px; margin: 20px 0; color: #00ff88; font-size: 13px; word-break: break-all; display: none; }
-  .generated-url.show { display: block; }
-  .modal-actions { display: flex; gap: 10px; }
-  .modal-actions button { flex: 1; padding: 12px; font-family: inherit; cursor: pointer; border: none; font-weight: bold; }
-  .btn-generate { background: #ff3333; color: #fff; }
-  .btn-copy { background: transparent; color: #00ff88; border: 1px solid #00ff88; }
-  .btn-close { position: absolute; top: 15px; right: 15px; background: none; border: none; color: #ff3333; font-size: 20px; cursor: pointer; }
+  .api-card h2 { font-size: 18px; margin-bottom: 15px; color: #ff3333; }
+  
+  .api-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+  .api-inputs input {
+    width: 100%; padding: 10px; background: rgba(255, 0, 0, 0.05);
+    border: 1px solid rgba(255, 0, 0, 0.3); color: #fff; font-family: inherit; outline: none;
+  }
+  .api-inputs input:focus { border-color: #ff0000; }
+  
+  .btn-copy-api { 
+    width: 100%; background: transparent; color: #ff3333; border: 1px solid #ff3333; 
+    padding: 12px; font-family: inherit; cursor: pointer; text-transform: uppercase; font-weight: bold;
+    transition: all 0.3s;
+  }
+  .btn-copy-api:hover { background: #ff3333; color: #000; box-shadow: 0 0 15px #ff3333; }
 
   @media (max-width: 600px) {
-    .api-card { flex-direction: column; align-items: flex-start; gap: 15px; }
-    .btn-start { width: 100%; }
+    .api-inputs { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -118,7 +112,7 @@
       
       <div id="queryFields"></div>
       
-      <button class="btn-query" onclick="doQuery()">SORGULA</button>
+      <button class="btn-query" id="btnSorgula" onclick="doQuery()">SORGULA</button>
     </div>
 
     <div class="result-box" id="resultBox"></div>
@@ -140,24 +134,10 @@
   </button>
 </div>
 
-<!-- MODAL (API LİNK OLUŞTURMA) -->
-<div class="modal-overlay" id="modal">
-  <div class="modal">
-    <button class="btn-close" onclick="closeModal()">✕</button>
-    <h3 id="modalTitle">API Linki</h3>
-    <div id="modalInputs"></div>
-    <div class="generated-url" id="generatedUrl"></div>
-    <div class="modal-actions">
-      <button class="btn-generate" onclick="generateUrl()">LİNKİ OLUŞTUR</button>
-      <button class="btn-copy" id="copyBtn" onclick="copyUrl()" style="display:none;">KOPYALA</button>
-    </div>
-  </div>
-</div>
-
 <script>
-// TÜM API TANIMLARI (Hem sorgu hem API kataloğu için ortak)
+// TÜM API TANIMLARI
 const API_DEFS = {
-  log:      { title: 'URL Log Çekme', params: [{k: 'url', l: 'Log Çekilecek URL', ph: 'https://...'}] },
+  log:      { title: 'URL Log Çekme', params: [{k: 'url', l: 'Log URL', ph: 'https://...'}] },
   adsoyad:  { title: 'Ad Soyad Sorgu', params: [{k: 'ad', l: 'Ad', ph: 'Ahmet'}, {k: 'soyad', l: 'Soyad', ph: 'Yılmaz'}, {k: 'il', l: 'İl (Opsiyonel)', ph: 'Ankara'}, {k: 'ilce', l: 'İlçe (Opsiyonel)', ph: 'Çankaya'}] },
   adililce: { title: 'Ad İl İlçe Sorgu', params: [{k: 'ad', l: 'Ad', ph: 'Ahmet'}, {k: 'il', l: 'İl', ph: 'Ankara'}, {k: 'ilce', l: 'İlçe', ph: 'Çankaya'}] },
   tc:       { title: 'TC Kimlik Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
@@ -195,8 +175,8 @@ function switchTab(tab) {
 const queryEndpoint = document.getElementById('queryEndpoint');
 const queryFields = document.getElementById('queryFields');
 const resultBox = document.getElementById('resultBox');
+const btnSorgula = document.getElementById('btnSorgula');
 
-// Dropdown'u doldur
 for (const [key, def] of Object.entries(API_DEFS)) {
   let opt = document.createElement('option');
   opt.value = key;
@@ -204,7 +184,6 @@ for (const [key, def] of Object.entries(API_DEFS)) {
   queryEndpoint.appendChild(opt);
 }
 
-// Form alanlarını çiz
 function renderQueryFields() {
   queryFields.innerHTML = '';
   let def = API_DEFS[queryEndpoint.value];
@@ -220,16 +199,15 @@ function renderQueryFields() {
 }
 
 queryEndpoint.addEventListener('change', renderQueryFields);
-renderQueryFields(); // İlk açılışta çiz
+renderQueryFields();
 
-// Sorguyu Çalıştır
 async function doQuery() {
   let def = API_DEFS[queryEndpoint.value];
   let params = new URLSearchParams();
   
   for (let p of def.params) {
     let val = document.getElementById(`q_${p.k}`).value.trim();
-    if (val) params.set(p.k, val); // Boş olanları es geç (Ad soyad il/ilçe opsiyonel)
+    if (val) params.set(p.k, val);
   }
 
   if (params.toString() === '') {
@@ -239,17 +217,40 @@ async function doQuery() {
 
   resultBox.innerHTML = "Sorgulanıyor...";
   resultBox.classList.add('show');
+  btnSorgula.disabled = true;
+  btnSorgula.innerText = "BEKLENİYOR...";
 
   try {
-    let res = await fetch(`/api/${queryEndpoint.value}?${params.toString()}`);
-    let data = await res.json();
+    // Timeout ekliyoruz ki sonsuza kadar beklemesin (15 saniye)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    let res = await fetch(`/api/${queryEndpoint.value}?${params.toString()}`, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    let text = await res.text(); // Önce text olarak alalım
+    let data;
+
+    try {
+      data = JSON.parse(text); // JSON'a çevirmeyi deneyelim
+    } catch (err) {
+      // Eğer JSON değilse API hata vermiş demektir
+      throw new Error("Sunucudan geçersiz yanıt geldi. API çalışmıyor olabilir. (Yanıt: " + text.substring(0, 30) + ")");
+    }
+
     renderResult(data);
   } catch (e) {
-    resultBox.innerHTML = `<span style="color:#ff5555;">Hata oluştu: ${e.message}</span>`;
+    if (e.name === 'AbortError') {
+      resultBox.innerHTML = `<span style="color:#ff5555;">Hata: Sunucu yanıt vermedi (Zaman aşımı). API'ye ulaşılamıyor.</span>`;
+    } else {
+      resultBox.innerHTML = `<span style="color:#ff5555;">Hata: ${e.message}</span>`;
+    }
+  } finally {
+    btnSorgula.disabled = false;
+    btnSorgula.innerText = "SORGULA";
   }
 }
 
-// Sonucu Kutu Formatında Bas
 function renderResult(data) {
   let records = [];
   if (Array.isArray(data.veri)) records = data.veri;
@@ -259,7 +260,7 @@ function renderResult(data) {
   records = records.filter(r => r && typeof r === 'object');
 
   if (!records.length) {
-    resultBox.innerHTML = '<span style="color:#ff5555;">Sonuç bulunamadı veya hata döndü.</span>';
+    resultBox.innerHTML = '<span style="color:#ff5555;">Sonuç bulunamadı veya veri boş döndü.</span>';
     return;
   }
 
@@ -272,7 +273,6 @@ function renderResult(data) {
         html += `┃➥ <span class="res-key">${label}:</span> <span class="res-val">${esc(String(rec[k]))}</span>\n`;
       }
     }
-    // Eşleşmeyen diğer alanlar
     for (const [k, v] of Object.entries(rec)) {
       if (!FIELD_MAP[k] && v !== undefined && v !== null && v !== '' && k !== 'auth' && k !== 'auth_alt') {
         html += `┃➥ <span class="res-key">${k}:</span> <span class="res-val">${esc(String(v))}</span>\n`;
@@ -287,71 +287,59 @@ function renderResult(data) {
 function esc(s) { return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 
-// --- API KATALOĞU MANTIĞI ---
+// --- API KATALOĞU MANTIĞI (MODAL YOK, DİREKT KOPYALA) ---
 const apiListEl = document.getElementById('apiList');
-const modal = document.getElementById('modal');
-const modalTitle = document.getElementById('modalTitle');
-const modalInputs = document.getElementById('modalInputs');
-const generatedUrlEl = document.getElementById('generatedUrl');
-const copyBtn = document.getElementById('copyBtn');
-let currentApi = null;
 
-// Listeyi Ekrana Bas
 for (const [key, def] of Object.entries(API_DEFS)) {
   const card = document.createElement('div');
   card.className = 'api-card';
+  
+  let inputsHtml = '';
+  def.params.forEach(p => {
+    inputsHtml += `<input type="text" id="api_${key}_${p.k}" placeholder="${p.l}">`;
+  });
+
   card.innerHTML = `
-    <div class="api-info">
-      <h2>${def.title}</h2>
-      <div class="code-snippet">/api/${key}?${def.params.map(p => p.k + '=...').join('&')}</div>
+    <h2>${def.title}</h2>
+    <div class="api-inputs" id="api_inputs_${key}">
+      ${inputsHtml}
     </div>
-    <button class="btn-start" onclick="openModal('${key}')">BAŞLAT</button>
+    <button class="btn-copy-api" onclick="copyApiLink('${key}')">LİNKİ OLUŞTUR & KOPYALA</button>
   `;
   apiListEl.appendChild(card);
 }
 
-function openModal(id) {
-  currentApi = id;
-  let def = API_DEFS[id];
-  modalTitle.innerText = def.title;
-  modalInputs.innerHTML = '';
-  generatedUrlEl.classList.remove('show');
-  copyBtn.style.display = 'none';
-
-  def.params.forEach(p => {
-    modalInputs.innerHTML += `
-      <div class="input-group">
-        <label>${p.l}</label>
-        <input type="text" id="api_${p.k}" placeholder="${p.ph}">
-      </div>
-    `;
-  });
-  modal.classList.add('active');
-}
-
-function closeModal() { modal.classList.remove('active'); }
-
-function generateUrl() {
-  let def = API_DEFS[currentApi];
+function copyApiLink(key) {
+  let def = API_DEFS[key];
   let queryParts = [];
   
   for (let p of def.params) {
-    let val = document.getElementById(`api_${p.k}`).value.trim();
+    let val = document.getElementById(`api_${key}_${p.k}`).value.trim();
     if (val) queryParts.push(`${p.k}=${encodeURIComponent(val)}`);
   }
 
-  if (queryParts.length === 0) { alert("En az bir alan doldurun!"); return; }
+  // Hiçbir şey girilmemişse örnek parametrelerle oluştur
+  if (queryParts.length === 0) {
+    queryParts = def.params.map(p => `${p.k}=ORNEK_DEGER`);
+  }
 
-  const finalUrl = `${domain}/api/${currentApi}?${queryParts.join('&')}`;
-  generatedUrlEl.innerText = finalUrl;
-  generatedUrlEl.classList.add('show');
-  copyBtn.style.display = 'block';
-}
-
-function copyUrl() {
-  navigator.clipboard.writeText(generatedUrlEl.innerText).then(() => {
-    copyBtn.innerText = "KOPYALANDI ✔";
-    setTimeout(() => copyBtn.innerText = "KOPYALA", 2000);
+  const finalUrl = `${domain}/api/${key}?${queryParts.join('&')}`;
+  
+  navigator.clipboard.writeText(finalUrl).then(() => {
+    // Butonun yazısını geçici olarak değiştir
+    const btn = document.querySelector(`#api_inputs_${key}`).nextElementSibling;
+    const oldText = btn.innerText;
+    btn.innerText = "KOPYALANDI ✔";
+    btn.style.background = "#00ff88";
+    btn.style.color = "#000";
+    
+    setTimeout(() => {
+      btn.innerText = oldText;
+      btn.style.background = "transparent";
+      btn.style.color = "#ff3333";
+    }, 2000);
+  }).catch(err => {
+    alert("Kopyalama başarısız: Tarayıcınız desteklemiyor olabilir.");
   });
 }
 </script>
