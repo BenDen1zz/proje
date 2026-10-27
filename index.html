@@ -21,13 +21,16 @@
   }
 
   .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+  
   .header { text-align: center; margin-bottom: 20px; border-bottom: 1px solid rgba(255,0,0,0.3); padding-bottom: 15px; }
   .header h1 { color: #ff3333; text-shadow: 0 0 10px rgba(255,51,51,0.5); font-size: 22px; letter-spacing: 2px; }
 
+  /* SEKMELER */
   .tab-content { display: none; animation: fadeIn 0.3s; }
   .tab-content.active { display: block; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
+  /* ALT MENÜ */
   .bottom-nav {
     position: fixed; bottom: 0; left: 0; width: 100%;
     background: #0a0000; border-top: 1px solid #ff3333;
@@ -44,6 +47,7 @@
   .nav-btn.active { color: #ff3333; text-shadow: 0 0 10px rgba(255,51,51,0.5); font-weight: bold; }
   .nav-icon { font-size: 20px; }
 
+  /* SORGU EKRANI */
   .query-box { background: rgba(10, 0, 0, 0.8); border: 1px solid rgba(255,0,0,0.3); padding: 20px; margin-bottom: 20px; }
   .query-box label { display: block; color: #ff5555; font-size: 13px; margin-bottom: 5px; }
   .query-box select, .query-box input {
@@ -52,20 +56,22 @@
     font-family: inherit; outline: none; margin-bottom: 15px;
   }
   .query-box select:focus, .query-box input:focus { border-color: #ff0000; background: rgba(255, 0, 0, 0.1); }
-  .btn-query { width: 100%; padding: 12px; background: #ff3333; color: #fff; border: none; font-family: inherit; font-size: 16px; cursor: pointer; font-weight: bold; text-transform: uppercase; }
+  .btn-query { width: 100%; padding: 12px; background: #ff3333; color: #fff; border: none; font-family: inherit; font-size: 16px; cursor: pointer; font-weight: bold; text-transform: uppercase; transition: 0.3s; }
   .btn-query:hover:not(:disabled) { background: #ff0000; box-shadow: 0 0 15px #ff0000; }
   .btn-query:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .result-box {
     background: #000; border: 1px solid #ff3333; padding: 20px;
     color: #00ff88; font-size: 14px; white-space: pre-wrap; display: none; border-radius: 5px;
-    box-shadow: 0 0 20px rgba(255, 0, 0, 0.2);
+    box-shadow: 0 0 20px rgba(255, 0, 0, 0.2); overflow-x: auto;
   }
   .result-box.show { display: block; }
   .res-title { color: #ffaa00; font-weight: bold; }
   .res-key { color: #4fc3f7; }
   .res-val { color: #00ff88; }
+  .res-err { color: #ff3333; }
 
+  /* API KATALOĞU */
   .api-card {
     background: rgba(10, 0, 0, 0.8); border: 1px solid rgba(255, 0, 0, 0.3);
     border-left: 5px solid #ff0000; padding: 20px; margin-bottom: 15px;
@@ -99,6 +105,7 @@
     <h1>/// SİSTEM PANELİ ///</h1>
   </div>
 
+  <!-- SORGU MENÜSÜ -->
   <div id="tab-sorgu" class="tab-content active">
     <div class="query-box">
       <label>Sorgu Tipi Seç</label>
@@ -109,11 +116,13 @@
     <div class="result-box" id="resultBox"></div>
   </div>
 
+  <!-- API KATALOĞU -->
   <div id="tab-api" class="tab-content">
     <div id="apiList"></div>
   </div>
 </div>
 
+<!-- ALT MENÜ -->
 <div class="bottom-nav">
   <button class="nav-btn active" onclick="switchTab('sorgu')" id="btn-sorgu">
     <span class="nav-icon">🔍</span> Sorgu Menüsü
@@ -124,23 +133,26 @@
 </div>
 
 <script>
+// TÜM API TANIMLARI
 const API_DEFS = {
-  log:      { title: 'URL Log Çekme', params: [{k: 'url', l: 'Log URL', ph: 'https://...'}] },
-  adsoyad:  { title: 'Ad Soyad Sorgu', params: [{k: 'ad', l: 'Ad', ph: 'Ahmet'}, {k: 'soyad', l: 'Soyad', ph: 'Yılmaz'}, {k: 'il', l: 'İl (Opsiyonel)', ph: 'Ankara'}, {k: 'ilce', l: 'İlçe (Opsiyonel)', ph: 'Çankaya'}] },
-  adililce: { title: 'Ad İl İlçe Sorgu', params: [{k: 'ad', l: 'Ad', ph: 'Ahmet'}, {k: 'il', l: 'İl', ph: 'Ankara'}, {k: 'ilce', l: 'İlçe', ph: 'Çankaya'}] },
-  tc:       { title: 'TC Kimlik Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
-  tcgsm:    { title: 'TC -> GSM Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
-  gsmtc:    { title: 'GSM -> TC Sorgu', params: [{k: 'gsm', l: 'GSM No', ph: '5xx...'}] },
-  ailepro:  { title: 'Aile Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
-  vesika:   { title: 'Vesika Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
-  isyeri:   { title: 'İş Yeri Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
-  sgk:      { title: 'SGK Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
-  adres:    { title: 'Adres Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] }
+  log:         { title: 'URL Log Çekme', params: [{k: 'url', l: 'Log URL', ph: 'https://...'}] },
+  adsoyad:     { title: 'Ad Soyad Sorgu', params: [{k: 'ad', l: 'Ad', ph: 'Ahmet'}, {k: 'soyad', l: 'Soyad', ph: 'Yılmaz'}, {k: 'il', l: 'İl (Opsiyonel)', ph: 'Ankara'}, {k: 'ilce', l: 'İlçe (Opsiyonel)', ph: 'Çankaya'}] },
+  adililce:    { title: 'Ad İl İlçe Sorgu', params: [{k: 'ad', l: 'Ad', ph: 'Ahmet'}, {k: 'il', l: 'İl', ph: 'Ankara'}, {k: 'ilce', l: 'İlçe', ph: 'Çankaya'}] },
+  tc:          { title: 'TC Kimlik Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
+  tcgsm:       { title: 'TC -> GSM Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
+  gsmtc:       { title: 'GSM -> TC Sorgu', params: [{k: 'gsm', l: 'GSM No', ph: '5xx...'}] },
+  ailepro:     { title: 'Aile Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
+  vesika:      { title: 'Vesika Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
+  isyeri:      { title: 'İş Yeri Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
+  sgk:         { title: 'SGK Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
+  adres:       { title: 'Adres Sorgu', params: [{k: 'tc', l: 'TC Kimlik No', ph: '11 haneli TC'}] },
+  tiktok_user: { title: 'TikTok Kullanıcı Sorgu', params: [{k: 'username', l: 'Kullanıcı Adı', ph: 'd9wqq'}] },
+  tiktok_id:   { title: 'TikTok ID ile Sorgu', params: [{k: 'user_id', l: 'TikTok ID', ph: '75869304178408169'}] }
 };
 
 const domain = window.location.origin;
 
-// GÜNCEL ALAN EŞLEŞTİRMESİ (Senin resimdeki NUFUSIL, UYRUK eklendi)
+// NÜFUS API'LERİ İÇİN ALAN EŞLEŞTİRMESİ
 const FIELD_MAP = {
   YAKINLIK: 'YAKINLIK DURUMU', TC: 'TC', ADI: 'ADI', SOYADI: 'SOYADI', GSM: 'GSM',
   BABAADI: 'BABA ADI', BABATC: 'BABA TC', ANNEADI: 'ANNE ADI', ANNETC: 'ANNE TC',
@@ -150,6 +162,7 @@ const FIELD_MAP = {
   BIREYSIRANO: 'BİREY SIRA NO', MEDENIHAL: 'MEDENİ HAL', CINSIYET: 'CİNSİYET', UYRUK: 'UYRUK',
 };
 
+// --- SEKME GEÇİŞİ ---
 function switchTab(tab) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
@@ -188,7 +201,8 @@ async function doQuery() {
     let val = document.getElementById(`q_${p.k}`).value.trim();
     if (val) params.set(p.k, val);
   }
-  if (params.toString() === '') { alert("En az bir alan doldurun!"); return; }
+  
+  if (params.toString() === '') { alert("Lütfen en az bir alan doldurun!"); return; }
 
   resultBox.innerHTML = "Sorgulanıyor...";
   resultBox.classList.add('show');
@@ -197,52 +211,100 @@ async function doQuery() {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 saniye zaman aşımı
+
     let res = await fetch(`/api/${queryEndpoint.value}?${params.toString()}`, { signal: controller.signal });
     clearTimeout(timeoutId);
+
     let text = await res.text(); 
     let data;
-    try { data = JSON.parse(text); } catch (err) { throw new Error("Geçersiz yanıt: " + text.substring(0, 30)); }
-    renderResult(data);
+    
+    try { 
+      data = JSON.parse(text); 
+    } catch (err) { 
+      throw new Error("API JSON yerine geçersiz bir yanıt döndürdü. (Sunucu çökmüş olabilir)"); 
+    }
+
+    renderResult(data, queryEndpoint.value);
+    
   } catch (e) {
-    resultBox.innerHTML = `<span style="color:#ff5555;">Hata: ${e.name === 'AbortError' ? 'Zaman aşımı' : e.message}</span>`;
+    let msg = e.name === 'AbortError' ? 'Zaman aşımı (Sunucu yanıt vermiyor)' : e.message;
+    resultBox.innerHTML = `<span class="res-err">Hata: ${msg}</span>`;
   } finally {
     btnSorgula.disabled = false;
     btnSorgula.innerText = "SORGULA";
   }
 }
 
-function renderResult(data) {
+function renderResult(data, endpoint) {
+  // TIKTOK SONUÇLARI İÇİN ÖZEL TASARIM
+  if (endpoint.includes('tiktok') && data.success && data.data) {
+    let d = data.data;
+    let html = `<span class="res-title">╭━━━━━━━ TIKTOK ━━━━━━━</span>\n`;
+    html += `┃➥ <span class="res-key">ID:</span> <span class="res-val">${d.id}</span>\n`;
+    html += `┃➥ <span class="res-key">KULLANICI ADI:</span> <span class="res-val">@${d.username}</span>\n`;
+    html += `┃➥ <span class="res-key">AD SOYAD:</span> <span class="res-val">${d.nickname}</span>\n`;
+    if(d.bio) html += `┃➥ <span class="res-key">BİYOGRAFİ:</span> <span class="res-val">${d.bio}</span>\n`;
+    html += `┃➥ <span class="res-key">TAKİPÇİ:</span> <span class="res-val">${d.stats.follower_count}</span>\n`;
+    html += `┃➥ <span class="res-key">TAKİP EDİLEN:</span> <span class="res-val">${d.stats.following_count}</span>\n`;
+    html += `┃➥ <span class="res-key">BEĞENİ:</span> <span class="res-val">${d.stats.heart_count}</span>\n`;
+    html += `╰━━━━━━━ TIKTOK ━━━━━━━`;
+    resultBox.innerHTML = html;
+    return;
+  }
+
+  if (data.success === false && data.error) {
+    resultBox.innerHTML = `<span class="res-err">TikTok Hatası: ${data.error}</span>`;
+    return;
+  }
+
+  // NÜFUS / DİĞER API SONUÇLARI İÇİN STANDART TASARIM
   let records = [];
   if (Array.isArray(data.veri)) records = data.veri;
   else if (data.veri && typeof data.veri === 'object') records = [data.veri];
-  else if (typeof data === 'object' && data !== null) records = [data];
+  else if (typeof data === 'object' && data !== null && !data.success) records = [data];
+  else if (data.data && Array.isArray(data.data)) records = data.data; // Fallback
+
   records = records.filter(r => r && typeof r === 'object');
 
-  if (!records.length) { resultBox.innerHTML = '<span style="color:#ff5555;">Sonuç yok.</span>'; return; }
+  if (!records.length) { 
+    resultBox.innerHTML = '<span class="res-err">Sonuç bulunamadı veya veri boş döndü.</span>'; 
+    return; 
+  }
 
   let html = '';
   records.forEach((rec, idx) => {
     if (idx > 0) html += '\n';
     html += `<span class="res-title">╭━━━━━━━ Gözlerin ━━━━━━━</span>\n`;
+    
+    let hasData = false;
     for (const [k, label] of Object.entries(FIELD_MAP)) {
       if (rec[k] !== undefined && rec[k] !== null && rec[k] !== '') {
         html += `┃➥ <span class="res-key">${label}:</span> <span class="res-val">${esc(String(rec[k]))}</span>\n`;
+        hasData = true;
       }
     }
+    // Eşleşmeyen diğer veriler
     for (const [k, v] of Object.entries(rec)) {
-      if (!FIELD_MAP[k] && v !== undefined && v !== null && v !== '' && k !== 'auth' && k !== 'auth_alt') {
+      if (!FIELD_MAP[k] && v !== undefined && v !== null && v !== '' && k !== 'auth' && k !== 'auth_alt' && typeof v !== 'object') {
         html += `┃➥ <span class="res-key">${k}:</span> <span class="res-val">${esc(String(v))}</span>\n`;
+        hasData = true;
       }
+    }
+    
+    if (!hasData) {
+        html += `┃➥ <span class="res-val">${JSON.stringify(rec).substring(0, 100)}...</span>\n`;
     }
     html += `<span class="res-title">╰━━━━━━━ Gözlerin ━━━━━━━</span>`;
   });
+  
   resultBox.innerHTML = html;
 }
+
 function esc(s) { return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 
-// --- API KATALOĞU (SADECE KOPYALA BUTONU) ---
+// --- API KATALOĞU MANTIĞI ---
 const apiListEl = document.getElementById('apiList');
 
 for (const [key, def] of Object.entries(API_DEFS)) {
