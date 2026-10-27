@@ -133,7 +133,7 @@
 </div>
 
 <script>
-// TÜM API TANIMLARI
+// TÜM API TANIMLARI (Discord Nick kaldırıldı, Token ve ID gelişmiş halde)
 const API_DEFS = {
   log:           { title: 'URL Log Çekme', params: [{k: 'url', l: 'Log URL', ph: 'https://...'}] },
   adsoyad:       { title: 'Ad Soyad Sorgu', params: [{k: 'ad', l: 'Ad', ph: 'Ahmet'}, {k: 'soyad', l: 'Soyad', ph: 'Yılmaz'}, {k: 'il', l: 'İl (Opsiyonel)', ph: 'Ankara'}, {k: 'ilce', l: 'İlçe (Opsiyonel)', ph: 'Çankaya'}] },
@@ -151,9 +151,8 @@ const API_DEFS = {
   tiktok_user:   { title: 'TikTok Kullanıcı Sorgu', params: [{k: 'username', l: 'Kullanıcı Adı', ph: 'd9wqq'}] },
   tiktok_id:     { title: 'TikTok ID ile Sorgu', params: [{k: 'user_id', l: 'TikTok ID', ph: '75869304178408169'}] },
   
-  // DISCORD
+  // DISCORD (Gelişmiş)
   discord_id:    { title: 'Discord ID Sorgu', params: [{k: 'id', l: 'Discord ID', ph: '123456789012345678'}] },
-  discord_nick:  { title: 'Discord Nick Sorgu', params: [{k: 'nick', l: 'Kullanıcı Adı', ph: 'kullanici'}] },
   discord_token: { title: 'Discord Token Çözücü', params: [{k: 'token', l: 'Token', ph: 'MTA...'}] },
   
   // INSTAGRAM
@@ -221,7 +220,7 @@ async function doQuery() {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 saniye zaman aşımı
 
     let res = await fetch(`/api/${queryEndpoint.value}?${params.toString()}`, { signal: controller.signal });
     clearTimeout(timeoutId);
@@ -265,7 +264,6 @@ function renderResult(data, endpoint) {
 
     let html = `<span class="res-title">╭━━━━━━━ ${title} ━━━━━━━</span>\n`;
     
-    // Veriyi döngüye al
     for (const [k, v] of Object.entries(d)) {
       if (v !== undefined && v !== null && v !== '') {
         html += `┃➥ <span class="res-key">${k}:</span> <span class="res-val">${esc(String(v))}</span>\n`;
