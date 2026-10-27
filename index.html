@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sorgu Paneli</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Courier New', monospace;
+    background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+  }
+  .container { max-width: 720px; width: 100%; }
+  h1 { text-align: center; margin-bottom: 20px; color: #4fc3f7; text-shadow: 0 0 20px rgba(79,195,247,0.5); letter-spacing: 2px; }
+  .card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(79,195,247,0.3);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  label { display: block; margin-bottom: 6px; font-size: 12px; color: #90caf9; text-transform: uppercase; letter-spacing: 1px; }
+  select, input {
+    width: 100%;
+    padding: 10px 12px;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(79,195,247,0.4);
+    border-radius: 8px;
+    color: #fff;
+    font-family: inherit;
+    margin-bottom: 12px;
+    font-size: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  select:focus, input:focus { outline: none; border-color: #4fc3f7; box-shadow: 0 0 10px rgba(79,195,247,0.4); }
+  button {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, #4fc3f7, #29b6f6);
+    border: none;
+    border-radius: 8px;
+    color: #0a0e27;
+    font-weight: bold;
+    font-size: 15px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    font-family: inherit;
+    letter-spacing: 1px;
+  }
+  button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(79,195,247,0.5); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .result {
+    background: #000;
+    border: 1px solid #4fc3f7;
+    border-radius: 8px;
+    padding: 20px 15px 15px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    white-space: pre;
+    overflow-x: auto;
+    display: none;
+    position: relative;
+    color: #00ff88;
+    box-shadow: 0 0 30px rgba(79,195,247,0.2);
+  }
+  .result.show { display: block; }
+  .key  { color: #4fc3f7; }
+  .val  { color: #00ff88; }
+  .title { color: #ffaa00; font-weight: bold; }
+
+  .copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: auto;
+    padding: 5px 10px;
+    font-size: 11px;
+    background: rgba(79,195,247,0.15);
+    color: #4fc3f7;
+    border: 1px solid #4fc3f7;
+    border-radius: 6px;
+    letter-spacing: 0;
+  }
+  .copy-btn:hover { background: rgba(79,195,247,0.35); transform: none; box-shadow: none; }
+
+  .status { text-align: center; margin-top: 10px; font-size: 13px; min-height: 18px; color: #888; }
+  .status.error { color: #ff5555; }
+  .status.loading { color: #ffaa00; }
+  .status.ok { color: #00ff88; }
+
+  .field-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 500px) { .field-group { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🔍 SORGU PANELİ</h1>
+
+  <div class="card">
+    <label for="endpoint">Sorgu Tipi</label>
+    <select id="endpoint">
+      <option value="tc">TC Doğrulama</option>
+      <option value="adsoyad">Ad Soyad Sorgu</option>
+      <option value="adililce">Ad İl İlçe</option>
+      <option value="tcgsm">TC → GSM</option>
+      <option value="gsmtc">GSM → TC</option>
+      <option value="adres">Adres Bilgisi</option>
+      <option value="sgk">SGK Kaydı</option>
+      <option value="isyeri">İşyeri Bilgisi</option>
+      <option value="vesika">Vesika</option>
+      <option value="ailepro">Aile Bilgisi</option>
+    </select>
+
+    <div id="fields"></div>
+
+    <button id="queryBtn">SORGULA</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="result" id="result">
+    <button class="copy-btn" id="copyBtn">📋 Kopyala</button>
+    <div id="resultContent"></div>
+  </div>
+</div>
+
+<script>
+const ROUTES = {
+  tc:       [{ n: 'tc',   p: '11 haneli TC' }],
+  adsoyad:  [{ n: 'ad', p: 'Ad' }, { n: 'soyad', p: 'Soyad' }, { n: 'il', p: 'İl' }, { n: 'ilce', p: 'İlçe' }],
+  adililce: [{ n: 'ad', p: 'Ad' }, { n: 'il', p: 'İl' }, { n: 'ilce', p: 'İlçe' }],
+  tcgsm:    [{ n: 'tc',   p: '11 haneli TC' }],
+  gsmtc:    [{ n: 'gsm',  p: 'GSM (5xx...)' }],
+  adres:    [{ n: 'tc',   p: '11 haneli TC' }],
+  sgk:      [{ n: 'tc',   p: '11 haneli TC' }],
+  isyeri:   [{ n: 'tc',   p: '11 haneli TC' }],
+  vesika:   [{ n: 'tc',   p: '11 haneli TC' }],
+  ailepro:  [{ n: 'tc',   p: '11 haneli TC' }],
+};
+
+const FIELD_MAP = {
+  YAKINLIK: 'YAKINLIK DURUMU',
+  TC: 'TC',
+  ADI: 'ADI',
+  SOYADI: 'SOYADI',
+  GSM: 'GSM',
+  BABAADI: 'BABA ADI',
+  BABATC: 'BABA TC',
+  ANNEADI: 'ANNE ADI',
+  ANNETC: 'ANNE TC',
+  DOGUMTARIHI: 'DOĞUM TARİHİ',
+  OLUMTARIHI: 'ÖLÜM TARİHİ',
+  DOGUMYERI: 'DOĞUM YERİ',
+  MEMLEKETIL: 'MEMLEKET İL',
+  MEMLEKETILCE: 'MEMLEKET İLÇE',
+  MEMLEKETKOY: 'MEMLEKET KÖY',
+  ADRESIL: 'ADRES İL',
+  ADRESILCE: 'ADRES İLÇE',
+  AILESIRANO: 'AİLE SIRA NO',
+  BIREYSIRANO: 'BİREY SIRA NO',
+  MEDENIHAL: 'MEDENİ HAL',
+  CINSIYET: 'CİNSİYET',
+};
+
+const $ = (id) => document.getElementById(id);
+const endpointSelect = $('endpoint');
+const fieldsDiv = $('fields');
+const queryBtn = $('queryBtn');
+const statusEl = $('status');
+const resultEl = $('result');
+const resultContent = $('resultContent');
+const copyBtn = $('copyBtn');
+
+function renderFields() {
+  const fields = ROUTES[endpointSelect.value];
+  const grid = document.createElement('div');
+  if (fields.length > 1) grid.className = 'field-group';
+  fields.forEach(f => {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `<label>${f.n.toUpperCase()}</label><input id="f_${f.n}" placeholder="${f.p}" autocomplete="off">`;
+    grid.appendChild(wrap);
+  });
+  fieldsDiv.innerHTML = '';
+  fieldsDiv.appendChild(grid);
+}
+
+function renderResult(data) {
+  let records = [];
+  if (Array.isArray(data.veri)) records = data.veri;
+  else if (data.veri && typeof data.veri === 'object') records = [data.veri];
+  else if (typeof data === 'object' && data !== null) records = [data];
+
+  records = records.filter(r => r && typeof r === 'object');
+
+  if (!records.length) {
+    resultContent.innerHTML = '<span class="key">Sonuç bulunamadı.</span>';
+    resultEl.classList.add('show');
+    return;
+  }
+
+  let html = '';
+  records.forEach((rec, idx) => {
+    if (idx > 0) html += '\n';
+    html += `<span class="title">╭━━━━━━━ Gozlerin ━━━━━━━</span>\n`;
+    for (const [k, label] of Object.entries(FIELD_MAP)) {
+      if (rec[k] !== undefined && rec[k] !== null && rec[k] !== '') {
+        html += `┃➥ <span class="key">${label}:</span> <span class="val">${esc(String(rec[k]))}</span>\n`;
+      }
+    }
+    for (const [k, v] of Object.entries(rec)) {
+      if (!FIELD_MAP[k] && v !== undefined && v !== null && v !== '' && k !== 'auth' && k !== 'auth_alt') {
+        html += `┃➥ <span class="key">${k}:</span> <span class="val">${esc(String(v))}</span>\n`;
+      }
+    }
+    html += `<span class="title">╰━━━━━━━ Gozlerin ━━━━━━━</span>`;
+  });
+
+  resultContent.innerHTML = html;
+  resultEl.classList.add('show');
+}
+
+function esc(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function doQuery() {
+  const fields = ROUTES[endpointSelect.value];
+  const params = new URLSearchParams();
+  for (const f of fields) {
+    const val = $('f_' + f.n).value.trim();
+    if (!val) {
+      statusEl.textContent = '⚠️ Tüm alanları doldur';
+      statusEl.className = 'status error';
+      return;
+    }
+    params.set(f.n, val);
+  }
+
+  queryBtn.disabled = true;
+  statusEl.textContent = '⏳ Sorgulanıyor...';
+  statusEl.className = 'status loading';
+  resultEl.classList.remove('show');
+
+  try {
+    const res = await fetch(`/api/${endpointSelect.value}?${params}`);
+    const data = await res.json();
+    statusEl.textContent = '✅ Tamamlandı';
+    statusEl.className = 'status ok';
+    renderResult(data);
+  } catch (e) {
+    statusEl.textContent = '❌ Hata: ' + e.message;
+    statusEl.className = 'status error';
+  } finally {
+    queryBtn.disabled = false;
+  }
+}
+
+endpointSelect.addEventListener('change', () => {
+  renderFields();
+  resultEl.classList.remove('show');
+  statusEl.textContent = '';
+});
+queryBtn.addEventListener('click', doQuery);
+document.addEventListener('keydown', e => { if (e.key === 'Enter') doQuery(); });
+
+copyBtn.addEventListener('click', async () => {
+  await navigator.clipboard.writeText(resultContent.innerText);
+  copyBtn.textContent = '✅ Kopyalandı';
+  setTimeout(() => copyBtn.textContent = '📋 Kopyala', 1500);
+});
+
+renderFields();
+</script>
+</body>
+</html>
